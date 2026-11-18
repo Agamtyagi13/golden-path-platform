@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: runs-as-root }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: runs-as-root } }
+  template:
+    metadata:
+      labels: { app: runs-as-root, owner: team-a, app.kubernetes.io/name: x }
+    spec:
+      securityContext: { runAsNonRoot: false, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: c
+          image: ghcr.io/nginxinc/nginx-unprivileged:1.27-alpine
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { memory: 128Mi } }
+          readinessProbe: { httpGet: { path: /, port: 8080 } }
+          livenessProbe: { httpGet: { path: /, port: 8080 } }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }

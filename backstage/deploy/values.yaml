@@ -1,0 +1,24 @@
+# helm repo add backstage https://backstage.github.io/charts
+# helm install backstage backstage/backstage -n backstage --create-namespace -f backstage/deploy/values.yaml
+# Secrets come from a pre-created Secret (never put tokens in this file):
+#   kubectl -n backstage create secret generic backstage-secrets \
+#     --from-literal=GITHUB_TOKEN=... --from-literal=POSTGRES_PASSWORD=...
+backstage:
+  image:
+    registry: ghcr.io
+    repository: YOUR_GITHUB_ORG/golden-path-backstage
+    tag: "1.0.0"
+  extraEnvVarsSecrets:
+    - backstage-secrets
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { memory: 1Gi }
+  podLabels:
+    owner: platform-team
+    app.kubernetes.io/name: backstage
+ingress:
+  enabled: true
+  className: nginx
+  host: backstage.example.com
+postgresql:
+  enabled: true

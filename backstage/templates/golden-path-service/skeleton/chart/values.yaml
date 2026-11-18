@@ -1,0 +1,32 @@
+replicaCount: ${{ values.replicas }}
+
+image:
+  repository: ghcr.io/${{ values.repoOwner }}/${{ values.name }}
+  tag: "1.0.0"          # CI overrides this with the commit SHA; never use "latest"
+  pullPolicy: IfNotPresent
+
+port: ${{ values.port }}
+
+# Ownership metadata (surfaced in Backstage and required by cluster policy)
+owner: ${{ values.ownerName }}
+system: ${{ values.system }}
+environment: ${{ values.environment }}
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ${{ values.name }}.example.com

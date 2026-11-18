@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: latest-tag }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: latest-tag } }
+  template:
+    metadata:
+      labels: { app: latest-tag, owner: team-a, app.kubernetes.io/name: x }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: c
+          image: ghcr.io/nginxinc/nginx-unprivileged:latest
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { memory: 128Mi } }
+          readinessProbe: { httpGet: { path: /, port: 8080 } }
+          livenessProbe: { httpGet: { path: /, port: 8080 } }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }

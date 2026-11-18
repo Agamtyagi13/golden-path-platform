@@ -1,0 +1,58 @@
+# Seed catalog so the template's OwnerPicker / EntityPicker have something to show.
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: engineering
+spec:
+  owner: group:default/platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: payments
+  description: Payment processing services
+spec:
+  owner: group:default/payments-team
+  domain: engineering
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: developer-platform
+spec:
+  owner: group:default/platform-team
+  domain: engineering
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: payments-team
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: agam-tyagi
+spec:
+  profile:
+    displayName: Agam Tyagi
+  memberOf: [platform-team]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: golden-path-templates
+spec:
+  type: file
+  targets:
+    - ../backstage/templates/golden-path-service/template.yaml

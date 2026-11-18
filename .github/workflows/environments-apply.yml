@@ -1,0 +1,49 @@
+name: environments-apply
+
+# A merged tenants/*.yaml (from a Backstage PR) becomes a real namespace.
+on:
+  pull_request:
+    paths: ["tenants/**", "terraform/**"]
+  push:
+    branches: [main]
+    paths: ["tenants/**", "terraform/**"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.9.8" }
+      - name: Kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+      - run: terraform -chdir=terraform/environments init -input=false
+      - run: terraform -chdir=terraform/environments plan -input=false -out=tfplan
+      - uses: actions/upload-artifact@v4
+        with: { name: tfplan, path: terraform/environments/tfplan }
+
+  apply:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: platform-prod   # configure required reviewers on this GitHub environment
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.9.8" }
+      - name: Kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+      - uses: actions/download-artifact@v4
+        with: { name: tfplan, path: terraform/environments }
+      - run: terraform -chdir=terraform/environments init -input=false
+      - run: terraform -chdir=terraform/environments apply -input=false tfplan

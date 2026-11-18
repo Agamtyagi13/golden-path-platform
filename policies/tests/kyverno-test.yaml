@@ -1,0 +1,122 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: golden-path-policies
+policies:
+- ../kyverno/disallow-latest-tag.yaml
+- ../kyverno/pod-security.yaml
+- ../kyverno/require-labels.yaml
+- ../kyverno/require-probes.yaml
+- ../kyverno/require-resources.yaml
+- ../kyverno/restrict-image-registries.yaml
+resources:
+- resources.yaml
+results:
+- policy: require-labels
+  rule: autogen-check-labels
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: require-labels
+  rule: autogen-check-labels
+  resources:
+  - bad-no-owner
+  kind: Deployment
+  result: fail
+- policy: disallow-latest-tag
+  rule: autogen-require-image-tag
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: disallow-latest-tag
+  rule: autogen-require-image-tag
+  resources:
+  - bad-untagged
+  kind: Deployment
+  result: fail
+- policy: disallow-latest-tag
+  rule: autogen-validate-image-tag
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: disallow-latest-tag
+  rule: autogen-validate-image-tag
+  resources:
+  - bad-latest
+  kind: Deployment
+  result: fail
+- policy: require-resources
+  rule: autogen-check-resources
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: require-resources
+  rule: autogen-check-resources
+  resources:
+  - bad-no-resources
+  kind: Deployment
+  result: fail
+- policy: require-probes
+  rule: autogen-check-probes
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: require-probes
+  rule: autogen-check-probes
+  resources:
+  - bad-no-probes
+  kind: Deployment
+  result: fail
+- policy: restrict-image-registries
+  rule: autogen-approved-registries
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: restrict-image-registries
+  rule: autogen-approved-registries
+  resources:
+  - bad-registry
+  kind: Deployment
+  result: fail
+- policy: pod-security
+  rule: autogen-deny-privileged
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: pod-security
+  rule: autogen-deny-privileged
+  resources:
+  - bad-privileged
+  kind: Deployment
+  result: fail
+- policy: pod-security
+  rule: autogen-run-as-non-root
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: pod-security
+  rule: autogen-run-as-non-root
+  resources:
+  - bad-root
+  kind: Deployment
+  result: fail
+- policy: pod-security
+  rule: autogen-no-privilege-escalation
+  resources:
+  - good
+  kind: Deployment
+  result: pass
+- policy: pod-security
+  rule: autogen-no-privilege-escalation
+  resources:
+  - bad-escalation
+  kind: Deployment
+  result: fail

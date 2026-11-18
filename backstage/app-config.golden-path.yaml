@@ -1,0 +1,48 @@
+# Merge into the generated Backstage app (see scripts/bootstrap-backstage.sh).
+# Run with: yarn start --config ../../app-config.yaml --config ../../app-config.golden-path.yaml
+app:
+  title: Golden Path Developer Portal
+  baseUrl: http://localhost:3000
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  cors:
+    origin: http://localhost:3000
+  database:
+    client: better-sqlite3   # switch to pg for production (see backstage/deploy/values.yaml)
+    connection: ':memory:'
+
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}      # fine-grained PAT: repo, workflow. Never commit the value.
+
+auth:
+  environment: development
+  providers:
+    guest: {}                     # demo only; use GitHub OAuth in real deployments
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Domain, Group, User, Template]
+  locations:
+    - type: file
+      target: ../../catalog/all.yaml
+    - type: file
+      target: ../../backstage/templates/golden-path-service/template.yaml
+      rules:
+        - allow: [Template]
+
+kubernetes:
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: local
+          url: ${K8S_API_URL}
+          authProvider: serviceAccount
+          serviceAccountToken: ${K8S_SA_TOKEN}
+          skipTLSVerify: true     # kind only

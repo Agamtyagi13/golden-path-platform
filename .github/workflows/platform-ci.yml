@@ -1,0 +1,79 @@
+name: platform-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install flask gunicorn pytest pyyaml yamllint
+      - run: |
+          yamllint -d "{extends: relaxed, rules: {line-length: disable}}" catalog policies tenants examples scripts/kind-config.yaml
+      - run: pytest tests -q
+
+  policies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kyverno/action-install-cli@v0.2.0
+        with: { release: v1.13.4 }
+      - name: Install conftest
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/conftest_0.56.0_Linux_x86_64.tar.gz | tar xz conftest
+          sudo mv conftest /usr/local/bin/
+      - run: conftest verify -p policies/opa
+      - run: kyverno test policies/tests
+      - name: Violation samples must be rejected by both engines
+        run: |
+          for f in examples/violations/*.yaml; do
+            if conftest test -p policies/opa "$f" >/dev/null 2>&1; then echo "OPA accepted $f"; exit 1; fi
+            kyverno apply policies/kyverno --resource "$f" | grep -Eq 'fail: [1-9]' || { echo "Kyverno accepted $f"; exit 1; }
+          done
+
+  rendered-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: azure/setup-helm@v4
+      - run: pip install pyyaml
+      - run: python scripts/render_skeleton.py /tmp/render
+      - run: helm lint /tmp/render/service/chart
+      - name: Conftest on rendered chart
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/conftest_0.56.0_Linux_x86_64.tar.gz | tar xz conftest
+          helm template hello /tmp/render/service/chart | ./conftest test -p policies/opa -
+
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [terraform/modules/tenant, terraform/environments, terraform/platform]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.9.8" }
+      - run: terraform fmt -check -recursive terraform
+      - run: terraform -chdir=${{ matrix.dir }} init -backend=false -input=false
+      - run: terraform -chdir=${{ matrix.dir }} validate
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          soft_fail: false
+          quiet: true

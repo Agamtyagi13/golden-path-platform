@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow latest / untagged images
+    policies.kyverno.io/description: Mutable tags make rollbacks and incident forensics unreliable.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      exclude:
+        any:
+          - resources:
+              namespaces: [kube-system, kyverno, ingress-nginx, backstage, local-path-storage]
+      validate:
+        message: "Images must carry an explicit tag or digest."
+        pattern:
+          spec:
+            containers:
+              - image: "*:* | *@sha256:*"
+    - name: validate-image-tag
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      exclude:
+        any:
+          - resources:
+              namespaces: [kube-system, kyverno, ingress-nginx, backstage, local-path-storage]
+      validate:
+        message: "Using ':latest' is not allowed."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"

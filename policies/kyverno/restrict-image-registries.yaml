@@ -1,0 +1,26 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Restrict image registries
+    policies.kyverno.io/description: Only images from approved registries. Narrow ghcr.io/* to ghcr.io/YOUR_GITHUB_ORG/* in production.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: approved-registries
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      exclude:
+        any:
+          - resources:
+              namespaces: [kube-system, kyverno, ingress-nginx, backstage, local-path-storage]
+      validate:
+        message: "Images must come from an approved registry (ghcr.io)."
+        pattern:
+          spec:
+            containers:
+              - image: "ghcr.io/*"

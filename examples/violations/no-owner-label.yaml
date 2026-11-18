@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: no-owner-label }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: no-owner-label } }
+  template:
+    metadata:
+      labels: { app: no-owner-label }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: c
+          image: ghcr.io/nginxinc/nginx-unprivileged:1.27-alpine
+          resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { memory: 128Mi } }
+          readinessProbe: { httpGet: { path: /, port: 8080 } }
+          livenessProbe: { httpGet: { path: /, port: 8080 } }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }

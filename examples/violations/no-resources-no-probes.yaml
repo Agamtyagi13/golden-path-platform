@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: no-resources-no-probes }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: bare } }
+  template:
+    metadata:
+      labels: { app: bare, owner: team-a, app.kubernetes.io/name: bare }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: c
+          image: ghcr.io/nginxinc/nginx-unprivileged:1.27-alpine
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }

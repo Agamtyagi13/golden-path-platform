@@ -1,0 +1,27 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+  annotations:
+    policies.kyverno.io/title: Require ownership labels
+    policies.kyverno.io/description: Every workload must declare an owner and app name so incidents and costs can be traced to a team.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-labels
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      exclude:
+        any:
+          - resources:
+              namespaces: [kube-system, kyverno, ingress-nginx, backstage, local-path-storage]
+      validate:
+        message: "Workloads must have labels 'owner' and 'app.kubernetes.io/name'."
+        pattern:
+          metadata:
+            labels:
+              owner: "?*"
+              app.kubernetes.io/name: "?*"

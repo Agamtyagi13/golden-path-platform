@@ -1,0 +1,162 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: golden-path-service
+  title: Golden Path - Python Microservice
+  description: >-
+    Scaffolds a production-ready Python service: repository, CI/CD, Helm chart,
+    ownership metadata, security checks and a guard-railed Kubernetes namespace.
+  tags: [recommended, python, kubernetes, helm, golden-path]
+spec:
+  owner: group:default/platform-team
+  type: service
+
+  parameters:
+    - title: Service details
+      required: [name, owner, system]
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Lowercase letters, digits and dashes (3-30 chars). Becomes repo, chart and namespace prefix.
+          pattern: '^[a-z][a-z0-9-]{2,29}$'
+          ui:autofocus: true
+        description:
+          title: Description
+          type: string
+          default: A service created from the golden path
+        owner:
+          title: Owner
+          type: string
+          description: Team that owns and is on-call for this service
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+        system:
+          title: System
+          type: string
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: System
+            defaultKind: System
+
+    - title: Runtime and environment
+      required: [environment, tier, costCenter]
+      properties:
+        environment:
+          title: Environment
+          type: string
+          enum: [dev, staging, prod]
+          default: dev
+        tier:
+          title: Resource tier (namespace quota)
+          type: string
+          enum: [small, medium, large]
+          default: small
+          description: "Guardrail: 'large' is not allowed in dev."
+        costCenter:
+          title: Cost center
+          type: string
+          pattern: '^[A-Z]{2,4}-[0-9]{3,5}$'
+          description: "Example: ENG-1042 (required for chargeback)"
+        port:
+          title: Container port
+          type: number
+          default: 8080
+        replicas:
+          title: Replicas
+          type: number
+          default: 2
+          minimum: 1
+          maximum: 10
+
+    - title: Repository
+      required: [repoUrl]
+      properties:
+        repoUrl:
+          title: Repository location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts: [github.com]
+
+  steps:
+    - id: fetch-service
+      name: Render service skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        # Files that contain their own {{ }} / ${{ }} syntax must NOT be rendered by Nunjucks.
+        copyWithoutRender:
+          - .github/workflows/*
+          - chart/templates/*
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          ownerName: ${{ parameters.owner | parseEntityRef | pick('name') }}
+          system: ${{ parameters.system | parseEntityRef | pick('name') }}
+          environment: ${{ parameters.environment }}
+          port: ${{ parameters.port }}
+          replicas: ${{ parameters.replicas }}
+          repoOwner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+          repoName: ${{ (parameters.repoUrl | parseRepoUrl).repo }}
+
+    - id: publish
+      name: Create GitHub repository
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+        defaultBranch: main
+        repoVisibility: public
+        topics: [golden-path, python, kubernetes]
+        requireCodeOwnerReviews: false
+
+    - id: register
+      name: Register in the catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+    - id: fetch-tenant
+      name: Render environment request
+      action: fetch:template
+      input:
+        url: ./tenant
+        targetPath: ./tenant-out
+        values:
+          name: ${{ parameters.name }}
+          ownerName: ${{ parameters.owner | parseEntityRef | pick('name') }}
+          environment: ${{ parameters.environment }}
+          tier: ${{ parameters.tier }}
+          costCenter: ${{ parameters.costCenter }}
+
+    - id: open-env-pr
+      name: Request namespace via GitOps pull request
+      action: publish:github:pull-request
+      input:
+        # Platform repo that owns Terraform + tenants/*.yaml. Change to your org.
+        repoUrl: github.com?owner=YOUR_GITHUB_ORG&repo=golden-path-platform
+        branchName: onboard-${{ parameters.name }}-${{ parameters.environment }}
+        title: "onboard: ${{ parameters.name }} (${{ parameters.environment }})"
+        description: |
+          Self-service environment request from Backstage.
+          Service: ${{ parameters.name }} | Owner: ${{ parameters.owner }} | Tier: ${{ parameters.tier }}
+          CI runs terraform validate/plan and policy checks; merge applies it.
+        sourcePath: ./tenant-out
+        targetPath: .
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
+      - title: Environment request (PR)
+        url: ${{ steps['open-env-pr'].output.remoteUrl }}

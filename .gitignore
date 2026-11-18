@@ -1,0 +1,10 @@
+.terraform/
+*.tfstate*
+tfplan
+backend.tf
+*.tfvars
+.env
+kubeconfig*
+node_modules/
+__pycache__/
+.pytest_cache/
